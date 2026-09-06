@@ -108,23 +108,50 @@ function normalizarMimeType(mimeType) {
   return (mimeType || "").split(";")[0].trim();
 }
 
+function esErrorTemporal(err) {
+  const status = err && err.status;
+  return status === 503 || status === 429;
+}
+
+function esperar(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function generarInformeConGemini({ audioBase64, mimeType, tipoInforme, datosPaciente }) {
   const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY.value() });
   const prompt = construirPrompt(tipoInforme, datosPaciente);
 
-  const response = await ai.models.generateContent({
-    model: MODELO_GEMINI,
-    contents: [
-      { text: prompt },
-      { inlineData: { mimeType: normalizarMimeType(mimeType), data: audioBase64 } },
-    ],
-  });
+  const intentos = 3;
+  let ultimoError;
 
-  const texto = (response.text || "").trim();
-  if (!texto) {
-    throw new Error("Gemini no devolvio texto para este audio.");
+  for (let intento = 1; intento <= intentos; intento++) {
+    try {
+      const response = await ai.models.generateContent({
+        model: MODELO_GEMINI,
+        contents: [
+          { text: prompt },
+          { inlineData: { mimeType: normalizarMimeType(mimeType), data: audioBase64 } },
+        ],
+      });
+
+      const texto = (response.text || "").trim();
+      if (!texto) {
+        throw new Error("Gemini no devolvio texto para este audio.");
+      }
+      return texto;
+    } catch (err) {
+      ultimoError = err;
+      const quedanIntentos = intento < intentos;
+      if (quedanIntentos && esErrorTemporal(err)) {
+        logger.warn(`Gemini no disponible (intento ${intento}/${intentos}), reintentando...`, err);
+        await esperar(1000 * 2 ** (intento - 1));
+        continue;
+      }
+      throw err;
+    }
   }
-  return texto;
+
+  throw ultimoError;
 }
 
 function generarDocx(tipoInforme, texto) {
