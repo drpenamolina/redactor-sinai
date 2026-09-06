@@ -139,7 +139,7 @@ function generarDocx(tipoInforme, texto) {
 const app = express();
 app.use(express.json({ limit: "25mb" }));
 
-app.post("/generarInforme", async (req, res) => {
+app.post("/api/generarInforme", async (req, res) => {
   try {
     const { audioBase64, mimeType, tipoInforme, datosPaciente } = req.body || {};
 
@@ -161,7 +161,7 @@ app.post("/generarInforme", async (req, res) => {
   }
 });
 
-app.post("/generarWord", async (req, res) => {
+app.post("/api/generarWord", async (req, res) => {
   try {
     const { texto, tipoInforme, datosPaciente } = req.body || {};
 
