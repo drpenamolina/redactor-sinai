@@ -101,6 +101,13 @@ function validarDatosPaciente(datosPaciente) {
   return Boolean(nombre && cedula && edad && fecha);
 }
 
+function normalizarMimeType(mimeType) {
+  // Gemini rechaza el mimeType si trae parametros de codec (ej. el
+  // "audio/webm;codecs=opus" que reporta MediaRecorder en Chrome) --
+  // solo acepta el tipo base.
+  return (mimeType || "").split(";")[0].trim();
+}
+
 async function generarInformeConGemini({ audioBase64, mimeType, tipoInforme, datosPaciente }) {
   const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY.value() });
   const prompt = construirPrompt(tipoInforme, datosPaciente);
@@ -109,7 +116,7 @@ async function generarInformeConGemini({ audioBase64, mimeType, tipoInforme, dat
     model: MODELO_GEMINI,
     contents: [
       { text: prompt },
-      { inlineData: { mimeType, data: audioBase64 } },
+      { inlineData: { mimeType: normalizarMimeType(mimeType), data: audioBase64 } },
     ],
   });
 
