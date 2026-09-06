@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Redactor Sinaí</title>
+<style>
+  :root {
+    --azul: #1f4e5f;
+    --azul-claro: #2f7a94;
+    --fondo: #f4f7f8;
+    --texto: #222;
+    --error: #b00020;
+    --ok: #1a7a3c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--fondo);
+    color: var(--texto);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    background: var(--azul);
+    color: white;
+    padding: 18px 20px;
+    text-align: center;
+    font-size: 1.3rem;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+  }
+  main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px 60px;
+  }
+  .pantalla {
+    width: 100%;
+    max-width: 560px;
+    display: none;
+    flex-direction: column;
+    gap: 18px;
+  }
+  .pantalla.activa { display: flex; }
+
+  h2 {
+    font-size: 1.25rem;
+    color: var(--azul);
+    margin: 4px 0 0 0;
+    text-align: center;
+  }
+  p.sub { text-align: center; color: #555; margin: -8px 0 0 0; font-size: 0.98rem; }
+
+  .btn-grande {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    width: 100%;
+    padding: 26px 18px;
+    font-size: 1.15rem;
+    font-weight: 600;
+    border-radius: 16px;
+    border: 2px solid var(--azul);
+    background: white;
+    color: var(--azul);
+    cursor: pointer;
+    transition: transform 0.1s ease, background 0.15s ease;
+  }
+  .btn-grande:active { transform: scale(0.98); }
+  .btn-grande:hover { background: #eef6f8; }
+  .btn-grande .icono { font-size: 1.8rem; }
+
+  .btn-primario {
+    width: 100%;
+    padding: 18px;
+    font-size: 1.15rem;
+    font-weight: 700;
+    border-radius: 14px;
+    border: none;
+    background: var(--azul);
+    color: white;
+    cursor: pointer;
+  }
+  .btn-primario:active { transform: scale(0.98); }
+  .btn-primario:disabled { background: #9fb3ba; cursor: not-allowed; }
+
+  .btn-secundario {
+    width: 100%;
+    padding: 14px;
+    font-size: 1rem;
+    font-weight: 600;
+    border-radius: 12px;
+    border: 2px solid #ccc;
+    background: white;
+    color: #444;
+    cursor: pointer;
+  }
+
+  label {
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: #333;
+    margin-bottom: 4px;
+    display: block;
+  }
+  input[type="text"], input[type="number"], input[type="date"] {
+    width: 100%;
+    padding: 14px;
+    font-size: 1.05rem;
+    border-radius: 10px;
+    border: 2px solid #ccc;
+    background: white;
+  }
+  input:focus { outline: none; border-color: var(--azul-claro); }
+
+  .campo { display: flex; flex-direction: column; }
+
+  .grabador {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    background: white;
+    border-radius: 18px;
+    padding: 28px 20px;
+    border: 2px dashed #ccc;
+  }
+  .boton-mic {
+    width: 96px;
+    height: 96px;
+    border-radius: 50%;
+    border: none;
+    background: var(--azul);
+    color: white;
+    font-size: 2.4rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 14px rgba(31,78,95,0.35);
+  }
+  .boton-mic.grabando {
+    background: #c0392b;
+    animation: pulso 1.4s infinite;
+  }
+  @keyframes pulso {
+    0% { box-shadow: 0 0 0 0 rgba(192,57,43,0.5); }
+    70% { box-shadow: 0 0 0 22px rgba(192,57,43,0); }
+    100% { box-shadow: 0 0 0 0 rgba(192,57,43,0); }
+  }
+  .cronometro {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--azul);
+    font-variant-numeric: tabular-nums;
+  }
+  .estado-audio {
+    font-size: 0.95rem;
+    color: #555;
+    text-align: center;
+  }
+
+  .cargando {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 50px 20px;
+  }
+  .spinner {
+    width: 54px;
+    height: 54px;
+    border: 6px solid #dce6e8;
+    border-top-color: var(--azul);
+    border-radius: 50%;
+    animation: girar 0.9s linear infinite;
+  }
+  @keyframes girar { to { transform: rotate(360deg); } }
+
+  .aviso {
+    background: #fff4e5;
+    border: 2px solid #e8a33d;
+    color: #6b4a00;
+    padding: 14px 16px;
+    border-radius: 12px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    text-align: center;
+  }
+
+  textarea#texto-informe {
+    width: 100%;
+    min-height: 420px;
+    padding: 16px;
+    font-size: 1rem;
+    line-height: 1.5;
+    border-radius: 12px;
+    border: 2px solid #ccc;
+    font-family: "Courier New", monospace;
+    white-space: pre-wrap;
+    resize: vertical;
+  }
+  textarea#texto-informe:focus { outline: none; border-color: var(--azul-claro); }
+
+  .mensaje-error {
+    background: #fdecea;
+    border: 2px solid var(--error);
+    color: var(--error);
+    padding: 14px 16px;
+    border-radius: 12px;
+    font-size: 0.95rem;
+    text-align: center;
+    font-weight: 600;
+  }
+
+  .paso-indicador {
+    text-align: center;
+    color: #999;
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+  }
+</style>
+</head>
+<body>
+
+<header>Redactor Sinaí</header>
+
+<main>
+
+  <!-- Pantalla 1: tipo de informe -->
+  <section class="pantalla activa" id="pantalla-1">
+    <p class="paso-indicador">PASO 1 DE 4</p>
+    <h2>¿Qué informe vas a redactar?</h2>
+    <button class="btn-grande" data-tipo="consulta">
+      <span class="icono">📋</span> Informe de Consulta
+    </button>
+    <button class="btn-grande" data-tipo="doppler">
+      <span class="icono">🩺</span> Doppler Venoso de Miembros Inferiores
+    </button>
+  </section>
+
+  <!-- Pantalla 2: datos del paciente + grabación -->
+  <section class="pantalla" id="pantalla-2">
+    <p class="paso-indicador">PASO 2 DE 4</p>
+    <h2>Datos del paciente</h2>
+
+    <div class="campo">
+      <label for="campo-nombre">Nombre completo</label>
+      <input type="text" id="campo-nombre" placeholder="Ej: María Pérez">
+    </div>
+    <div class="campo">
+      <label for="campo-cedula">Cédula</label>
+      <input type="text" id="campo-cedula" placeholder="Ej: V-12345678">
+    </div>
+    <div class="campo">
+      <label for="campo-edad">Edad</label>
+      <input type="number" id="campo-edad" placeholder="Ej: 54" min="0" max="130">
+    </div>
+    <div class="campo">
+      <label for="campo-fecha">Fecha</label>
+      <input type="date" id="campo-fecha">
+    </div>
+
+    <h2 style="margin-top:10px;">Graba tu dictado</h2>
+    <p class="sub">Cuenta los hallazgos de la consulta como si se los dictaras a tu historia. Ten tu historia en papel al lado como apoyo.</p>
+
+    <div class="grabador">
+      <button class="boton-mic" id="boton-mic">🎙️</button>
+      <div class="cronometro" id="cronometro">00:00</div>
+      <div class="estado-audio" id="estado-audio">Toca el micrófono para empezar a grabar</div>
+    </div>
+
+    <div id="error-pantalla-2" class="mensaje-error" style="display:none;"></div>
+
+    <button class="btn-primario" id="btn-generar-informe" disabled>Generar informe</button>
+    <button class="btn-secundario" id="btn-volver-1">Volver</button>
+  </section>
+
+  <!-- Pantalla 3: cargando -->
+  <section class="pantalla" id="pantalla-3">
+    <div class="cargando">
+      <div class="spinner"></div>
+      <h2>Escuchando y redactando…</h2>
+      <p class="sub">Esto puede tardar hasta 40 segundos. No cierres esta pantalla.</p>
+    </div>
+    <div id="error-pantalla-3" class="mensaje-error" style="display:none;"></div>
+    <button class="btn-secundario" id="btn-volver-2" style="display:none;">Volver e intentar de nuevo</button>
+  </section>
+
+  <!-- Pantalla 4: resultado -->
+  <section class="pantalla" id="pantalla-4">
+    <p class="paso-indicador">PASO 4 DE 4</p>
+    <h2>Revisa el informe</h2>
+    <div class="aviso">⚠️ Revisa este informe contra tu historia clínica antes de firmarlo. La IA puede cometer errores.</div>
+    <textarea id="texto-informe"></textarea>
+    <div id="error-pantalla-4" class="mensaje-error" style="display:none;"></div>
+    <button class="btn-primario" id="btn-descargar-word">Descargar Word</button>
+    <button class="btn-secundario" id="btn-nuevo-informe">Empezar un informe nuevo</button>
+  </section>
+
+</main>
+
+<script>
+(function () {
+  "use strict";
+
+  const estado = {
+    tipoInforme: null,
+    datosPaciente: null,
+    audioBlob: null,
+    mimeType: null,
+    textoInforme: null,
+  };
+
+  const pantallas = {
+    1: document.getElementById("pantalla-1"),
+    2: document.getElementById("pantalla-2"),
+    3: document.getElementById("pantalla-3"),
+    4: document.getElementById("pantalla-4"),
+  };
+
+  function mostrarPantalla(n) {
+    Object.values(pantallas).forEach((p) => p.classList.remove("activa"));
+    pantallas[n].classList.add("activa");
+  }
+
+  // ---------- Pantalla 1 ----------
+  document.querySelectorAll(".btn-grande[data-tipo]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      estado.tipoInforme = btn.getAttribute("data-tipo");
+      const hoy = new Date().toISOString().slice(0, 10);
+      document.getElementById("campo-fecha").value = hoy;
+      mostrarPantalla(2);
+    });
+  });
+
+  // ---------- Pantalla 2: grabación ----------
+  let mediaRecorder = null;
+  let chunks = [];
+  let cronometroInterval = null;
+  let segundos = 0;
+  let grabando = false;
+
+  const botonMic = document.getElementById("boton-mic");
+  const cronometroEl = document.getElementById("cronometro");
+  const estadoAudioEl = document.getElementById("estado-audio");
+  const btnGenerar = document.getElementById("btn-generar-informe");
+  const errorPantalla2 = document.getElementById("error-pantalla-2");
+
+  function formatoTiempo(s) {
+    const m = Math.floor(s / 60).toString().padStart(2, "0");
+    const ss = (s % 60).toString().padStart(2, "0");
+    return `${m}:${ss}`;
+  }
+
+  function elegirMimeType() {
+    const candidatos = [
+      "audio/webm;codecs=opus",
+      "audio/webm",
+      "audio/mp4",
+      "audio/ogg;codecs=opus",
+    ];
+    for (const tipo of candidatos) {
+      if (window.MediaRecorder && MediaRecorder.isTypeSupported(tipo)) {
+        return tipo;
+      }
+    }
+    return "";
+  }
+
+  async function iniciarGrabacion() {
+    errorPantalla2.style.display = "none";
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = elegirMimeType();
+      mediaRecorder = mimeType
+        ? new MediaRecorder(stream, { mimeType })
+        : new MediaRecorder(stream);
+      estado.mimeType = mediaRecorder.mimeType || mimeType || "audio/webm";
+      chunks = [];
+
+      mediaRecorder.addEventListener("dataavailable", (e) => {
+        if (e.data.size > 0) chunks.push(e.data);
+      });
+
+      mediaRecorder.addEventListener("stop", () => {
+        estado.audioBlob = new Blob(chunks, { type: estado.mimeType });
+        stream.getTracks().forEach((t) => t.stop());
+        estadoAudioEl.textContent = `Audio grabado (${formatoTiempo(segundos)}). Puedes generar el informe o volver a grabar.`;
+        btnGenerar.disabled = false;
+      });
+
+      mediaRecorder.start();
+      grabando = true;
+      segundos = 0;
+      cronometroEl.textContent = formatoTiempo(segundos);
+      cronometroInterval = setInterval(() => {
+        segundos++;
+        cronometroEl.textContent = formatoTiempo(segundos);
+      }, 1000);
+
+      botonMic.classList.add("grabando");
+      botonMic.textContent = "⏹️";
+      estadoAudioEl.textContent = "Grabando… toca de nuevo para detener";
+      btnGenerar.disabled = true;
+    } catch (err) {
+      errorPantalla2.style.display = "block";
+      errorPantalla2.textContent =
+        "No se pudo acceder al micrófono. Revisa los permisos del navegador e intenta de nuevo.";
+    }
+  }
+
+  function detenerGrabacion() {
+    if (mediaRecorder && grabando) {
+      mediaRecorder.stop();
+    }
+    grabando = false;
+    clearInterval(cronometroInterval);
+    botonMic.classList.remove("grabando");
+    botonMic.textContent = "🎙️";
+  }
+
+  botonMic.addEventListener("click", () => {
+    if (!grabando) {
+      iniciarGrabacion();
+    } else {
+      detenerGrabacion();
+    }
+  });
+
+  document.getElementById("btn-volver-1").addEventListener("click", () => {
+    if (grabando) detenerGrabacion();
+    mostrarPantalla(1);
+  });
+
+  // ---------- Generar informe ----------
+  function blobABase64(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const resultado = reader.result;
+        const base64 = resultado.split(",")[1];
+        resolve(base64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  function leerDatosPaciente() {
+    return {
+      nombre: document.getElementById("campo-nombre").value.trim(),
+      cedula: document.getElementById("campo-cedula").value.trim(),
+      edad: document.getElementById("campo-edad").value.trim(),
+      fecha: document.getElementById("campo-fecha").value,
+    };
+  }
+
+  const errorPantalla3 = document.getElementById("error-pantalla-3");
+  const btnVolver2 = document.getElementById("btn-volver-2");
+
+  document.getElementById("btn-generar-informe").addEventListener("click", async () => {
+    const datos = leerDatosPaciente();
+    if (!datos.nombre || !datos.cedula || !datos.edad || !datos.fecha) {
+      errorPantalla2.style.display = "block";
+      errorPantalla2.textContent = "Completa nombre, cédula, edad y fecha antes de continuar.";
+      return;
+    }
+    if (!estado.audioBlob) {
+      errorPantalla2.style.display = "block";
+      errorPantalla2.textContent = "Graba el audio antes de generar el informe.";
+      return;
+    }
+    estado.datosPaciente = datos;
+
+    errorPantalla3.style.display = "none";
+    btnVolver2.style.display = "none";
+    mostrarPantalla(3);
+
+    try {
+      const audioBase64 = await blobABase64(estado.audioBlob);
+      const resp = await fetch("/api/generarInforme", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          audioBase64,
+          mimeType: estado.mimeType,
+          tipoInforme: estado.tipoInforme,
+          datosPaciente: estado.datosPaciente,
+        }),
+      });
+
+      if (!resp.ok) {
+        const cuerpo = await resp.json().catch(() => ({}));
+        throw new Error(cuerpo.error || `Error del servidor (${resp.status})`);
+      }
+
+      const data = await resp.json();
+      estado.textoInforme = data.texto;
+      document.getElementById("texto-informe").value = estado.textoInforme;
+      mostrarPantalla(4);
+    } catch (err) {
+      errorPantalla3.style.display = "block";
+      errorPantalla3.textContent =
+        "No se pudo generar el informe: " + (err.message || "intenta de nuevo.");
+      btnVolver2.style.display = "block";
+    }
+  });
+
+  btnVolver2.addEventListener("click", () => {
+    mostrarPantalla(2);
+  });
+
+  // ---------- Pantalla 4: descargar Word ----------
+  const errorPantalla4 = document.getElementById("error-pantalla-4");
+
+  document.getElementById("btn-descargar-word").addEventListener("click", async () => {
+    errorPantalla4.style.display = "none";
+    const textoFinal = document.getElementById("texto-informe").value;
+    const boton = document.getElementById("btn-descargar-word");
+    const textoOriginalBoton = boton.textContent;
+    boton.disabled = true;
+    boton.textContent = "Generando Word…";
+
+    try {
+      const resp = await fetch("/api/generarWord", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          texto: textoFinal,
+          tipoInforme: estado.tipoInforme,
+          datosPaciente: estado.datosPaciente,
+        }),
+      });
+
+      if (!resp.ok) {
+        const cuerpo = await resp.json().catch(() => ({}));
+        throw new Error(cuerpo.error || `Error del servidor (${resp.status})`);
+      }
+
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const nombreArchivo = `informe-${(estado.datosPaciente.nombre || "paciente").replace(/\s+/g, "_")}.docx`;
+      a.href = url;
+      a.download = nombreArchivo;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      errorPantalla4.style.display = "block";
+      errorPantalla4.textContent =
+        "No se pudo generar el Word: " + (err.message || "intenta de nuevo.");
+    } finally {
+      boton.disabled = false;
+      boton.textContent = textoOriginalBoton;
+    }
+  });
+
+  document.getElementById("btn-nuevo-informe").addEventListener("click", () => {
+    estado.tipoInforme = null;
+    estado.datosPaciente = null;
+    estado.audioBlob = null;
+    estado.mimeType = null;
+    estado.textoInforme = null;
+    document.getElementById("campo-nombre").value = "";
+    document.getElementById("campo-cedula").value = "";
+    document.getElementById("campo-edad").value = "";
+    document.getElementById("campo-fecha").value = "";
+    document.getElementById("texto-informe").value = "";
+    estadoAudioEl.textContent = "Toca el micrófono para empezar a grabar";
+    cronometroEl.textContent = "00:00";
+    btnGenerar.disabled = true;
+    mostrarPantalla(1);
+  });
+})();
+</script>
+
+</body>
+</html>
