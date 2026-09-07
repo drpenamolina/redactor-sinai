@@ -234,8 +234,20 @@
 
 <main>
 
+  <!-- Pantalla 0: acceso con PIN -->
+  <section class="pantalla" id="pantalla-0">
+    <h2>Acceso</h2>
+    <p class="sub">Ingresa el PIN que te compartieron para usar Redactor Sinaí.</p>
+    <div class="campo">
+      <label for="campo-pin">PIN</label>
+      <input type="text" inputmode="numeric" id="campo-pin" placeholder="Ej: 123456">
+    </div>
+    <div id="error-pantalla-0" class="mensaje-error" style="display:none;"></div>
+    <button class="btn-primario" id="btn-entrar-pin">Entrar</button>
+  </section>
+
   <!-- Pantalla 1: tipo de informe -->
-  <section class="pantalla activa" id="pantalla-1">
+  <section class="pantalla" id="pantalla-1">
     <p class="paso-indicador">PASO 1 DE 4</p>
     <h2>¿Qué informe vas a redactar?</h2>
     <button class="btn-grande" data-tipo="consulta">
@@ -320,6 +332,7 @@
   };
 
   const pantallas = {
+    0: document.getElementById("pantalla-0"),
     1: document.getElementById("pantalla-1"),
     2: document.getElementById("pantalla-2"),
     3: document.getElementById("pantalla-3"),
@@ -329,6 +342,77 @@
   function mostrarPantalla(n) {
     Object.values(pantallas).forEach((p) => p.classList.remove("activa"));
     pantallas[n].classList.add("activa");
+  }
+
+  // ---------- Pantalla 0: PIN ----------
+  const CLAVE_PIN_GUARDADO = "redactorSinaiPin";
+
+  function obtenerPinGuardado() {
+    try {
+      return localStorage.getItem(CLAVE_PIN_GUARDADO) || "";
+    } catch (e) {
+      return "";
+    }
+  }
+
+  function guardarPin(pin) {
+    try {
+      localStorage.setItem(CLAVE_PIN_GUARDADO, pin);
+    } catch (e) {
+      // localStorage no disponible; el PIN solo dura esta sesion.
+    }
+  }
+
+  function borrarPinGuardado() {
+    try {
+      localStorage.removeItem(CLAVE_PIN_GUARDADO);
+    } catch (e) {
+      // ignorar
+    }
+  }
+
+  const errorPantalla0 = document.getElementById("error-pantalla-0");
+
+  document.getElementById("btn-entrar-pin").addEventListener("click", () => {
+    const pin = document.getElementById("campo-pin").value.trim();
+    if (!pin) {
+      errorPantalla0.style.display = "block";
+      errorPantalla0.textContent = "Ingresa el PIN para continuar.";
+      return;
+    }
+    guardarPin(pin);
+    errorPantalla0.style.display = "none";
+    mostrarPantalla(1);
+  });
+
+  document.getElementById("campo-pin").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") document.getElementById("btn-entrar-pin").click();
+  });
+
+  if (obtenerPinGuardado()) {
+    mostrarPantalla(1);
+  } else {
+    mostrarPantalla(0);
+  }
+
+  function cabecerasApi() {
+    return {
+      "Content-Type": "application/json",
+      "X-App-Pin": obtenerPinGuardado(),
+    };
+  }
+
+  async function lanzarSiNoOk(resp) {
+    if (resp.ok) return;
+    if (resp.status === 401) {
+      borrarPinGuardado();
+      mostrarPantalla(0);
+      errorPantalla0.style.display = "block";
+      errorPantalla0.textContent = "El PIN no es correcto. Intenta de nuevo.";
+      throw new Error("PIN incorrecto.");
+    }
+    const cuerpo = await resp.json().catch(() => ({}));
+    throw new Error(cuerpo.error || `Error del servidor (${resp.status})`);
   }
 
   // ---------- Pantalla 1 ----------
@@ -488,7 +572,7 @@
       const audioBase64 = await blobABase64(estado.audioBlob);
       const resp = await fetch("/api/generarInforme", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: cabecerasApi(),
         body: JSON.stringify({
           audioBase64,
           mimeType: estado.mimeType,
@@ -497,10 +581,7 @@
         }),
       });
 
-      if (!resp.ok) {
-        const cuerpo = await resp.json().catch(() => ({}));
-        throw new Error(cuerpo.error || `Error del servidor (${resp.status})`);
-      }
+      await lanzarSiNoOk(resp);
 
       const data = await resp.json();
       estado.textoInforme = data.texto;
@@ -532,7 +613,7 @@
     try {
       const resp = await fetch("/api/generarWord", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: cabecerasApi(),
         body: JSON.stringify({
           texto: textoFinal,
           tipoInforme: estado.tipoInforme,
@@ -540,10 +621,7 @@
         }),
       });
 
-      if (!resp.ok) {
-        const cuerpo = await resp.json().catch(() => ({}));
-        throw new Error(cuerpo.error || `Error del servidor (${resp.status})`);
-      }
+      await lanzarSiNoOk(resp);
 
       const blob = await resp.blob();
       const url = URL.createObjectURL(blob);

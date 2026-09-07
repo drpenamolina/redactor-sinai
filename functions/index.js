@@ -1,5 +1,6 @@
 const path = require("path");
 const fs = require("fs");
+const crypto = require("crypto");
 
 const { onRequest } = require("firebase-functions/v2/https");
 const { defineSecret } = require("firebase-functions/params");
@@ -17,6 +18,11 @@ const MODELO_GEMINI = "gemini-3.8-flash";
 // Secreto de Firebase con la API key de Gemini.
 // Se crea con: firebase functions:secrets:set GEMINI_API_KEY
 const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
+
+// PIN compartido para evitar que cualquiera en internet use el endpoint
+// (que llama a Gemini con costo asociado). Se crea con:
+// firebase functions:secrets:set APP_PIN
+const APP_PIN = defineSecret("APP_PIN");
 
 const ESQUELETOS = {
   consulta: `INFORME MEDICO DE CONSULTA
@@ -170,8 +176,25 @@ function generarDocx(tipoInforme, texto) {
   return doc.getZip().generate({ type: "nodebuffer" });
 }
 
+function pinValido(pinRecibido) {
+  const pinEsperado = APP_PIN.value();
+  const bufRecibido = Buffer.from(String(pinRecibido || ""));
+  const bufEsperado = Buffer.from(String(pinEsperado || ""));
+  if (bufRecibido.length !== bufEsperado.length) return false;
+  return crypto.timingSafeEqual(bufRecibido, bufEsperado);
+}
+
+function verificarPin(req, res, next) {
+  const pinRecibido = req.get("X-App-Pin");
+  if (!pinValido(pinRecibido)) {
+    return res.status(401).json({ error: "PIN incorrecto." });
+  }
+  next();
+}
+
 const app = express();
 app.use(express.json({ limit: "25mb" }));
+app.use(verificarPin);
 
 app.post("/api/generarInforme", async (req, res) => {
   try {
@@ -221,7 +244,7 @@ app.post("/api/generarWord", async (req, res) => {
 
 exports.api = onRequest(
   {
-    secrets: [GEMINI_API_KEY],
+    secrets: [GEMINI_API_KEY, APP_PIN],
     region: "us-central1",
     timeoutSeconds: 120,
     memory: "512MiB",
